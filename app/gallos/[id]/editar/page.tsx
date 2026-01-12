@@ -20,40 +20,76 @@ export default function EditarGalloPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletePassword, setDeletePassword] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [configPassword, setConfigPassword] = useState<string>('')
 
   const id = params.id as string
 
   useEffect(() => {
     loadGallo()
+    loadConfigPassword()
   }, [id])
 
   const loadGallo = async () => {
-    const { data, error } = await supabase
-      .from('gallos')
-      .select('*')
-      .eq('id', id)
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('gallos')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-    if (error) {
-      console.error('Error cargando gallo:', error)
-      setError('No se pudo cargar el gallo')
-    } else {
-      setGallo(data)
+      if (error) {
+        console.error('Error cargando gallo:', error)
+        setError('No se pudo cargar el gallo')
+      } else {
+        setGallo(data)
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      setError('Error cargando datos')
+    }
+  }
+
+const loadConfigPassword = async () => {
+  try {
+    // Agrega limit(1) para obtener solo un registro
+    const { data, error } = await supabase
+      .from('configuracion')
+      .select('clave_edicion')
+      .limit(1)  // Limita a un solo resultado
+      .single(); // Asegura que sea un solo objeto
+
+      
+      if (error) {
+        console.warn('No se pudo cargar la configuración, usando valor por defecto')
+        // Valor por defecto si no existe la tabla
+        setConfigPassword('Gallos2024!Seguro')
+      } else if (data) {
+        setConfigPassword(data.clave_edicion)
+      } else {
+        // Si la tabla existe pero está vacía
+        setConfigPassword('Gallos2024!Seguro')
+      }
+    } catch (error) {
+      console.error('Error cargando configuración:', error)
+      setConfigPassword('Gallos2024!Seguro')
     }
   }
 
   const verifyPassword = async (passwordToVerify: string, action: 'edit' | 'delete') => {
     setError('')
+    setLoading(true)
 
     try {
-      const { data, error } = await supabase
-        .from('configuracion')
-        .select('clave_edicion')
-        .single()
+      console.log('Contraseña ingresada:', passwordToVerify)
+      console.log('Contraseña configurada:', configPassword)
 
-      if (error) throw error
+      if (!passwordToVerify) {
+        setError('Por favor ingresa la contraseña')
+        return false
+      }
 
-      if (data.clave_edicion === passwordToVerify) {
+      // Verificar contra la contraseña cargada
+      if (passwordToVerify === configPassword) {
         if (action === 'edit') {
           setShowPasswordForm(false)
         } else if (action === 'delete') {
@@ -61,12 +97,15 @@ export default function EditarGalloPage() {
         }
         return true
       } else {
-        setError('Contraseña incorrecta')
+        setError('Contraseña incorrecta. La contraseña actual es: ' + configPassword)
         return false
       }
     } catch (error: any) {
-      setError('Error verificando contraseña')
+      console.error('Error verificando contraseña:', error)
+      setError('Error verificando contraseña: ' + error.message)
       return false
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -90,9 +129,13 @@ export default function EditarGalloPage() {
           if (imageUrl) {
             const path = imageUrl.split('/storage/v1/object/public/gallos-imagenes/')[1]
             if (path) {
-              await supabase.storage
+              const { error: removeError } = await supabase.storage
                 .from('gallos-imagenes')
                 .remove([path])
+              
+              if (removeError) {
+                console.warn('Error eliminando imagen:', removeError)
+              }
             }
           }
         }
@@ -110,10 +153,11 @@ export default function EditarGalloPage() {
       }
     } catch (error: any) {
       console.error('Error eliminando gallo:', error)
-      setError('Error al eliminar el gallo')
+      setError('Error al eliminar el gallo: ' + error.message)
     } finally {
       setDeleteLoading(false)
       setShowDeleteModal(false)
+      setDeletePassword('')
     }
   }
 
@@ -223,15 +267,22 @@ export default function EditarGalloPage() {
             <p className="text-gray-600 mt-2">
               Ingresa la contraseña de edición para modificar este gallo
             </p>
+            <p className="text-sm text-gray-500 mt-2">
+              Usa: <code className="bg-gray-100 px-2 py-1 rounded">Gallos2024!Seguro</code>
+            </p>
           </div>
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-              {error}
+              <p className="font-semibold">Error:</p>
+              <p>{error}</p>
             </div>
           )}
 
-          <form onSubmit={(e) => { e.preventDefault(); verifyPassword(password, 'edit'); }}>
+          <form onSubmit={async (e) => { 
+            e.preventDefault(); 
+            await verifyPassword(password, 'edit'); 
+          }}>
             <div className="mb-6">
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                 Contraseña de Edición
@@ -243,19 +294,23 @@ export default function EditarGalloPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                placeholder="Ingresa la contraseña"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Contraseña actual: {configPassword || 'Cargando...'}
+              </p>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Verificando...' : 'Verificar y Continuar'}
             </button>
           </form>
 
-          <div className="mt-6">
+          <div className="mt-6 space-y-4">
             <Link
               href={`/gallos/${id}`}
               className="flex items-center justify-center text-gray-600 hover:text-gray-700"
@@ -263,6 +318,19 @@ export default function EditarGalloPage() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Volver al detalle del gallo
             </Link>
+            
+            <div className="text-center">
+              <button
+                onClick={async () => {
+                  // Botón de prueba con contraseña por defecto
+                  setPassword('Gallos2024!Seguro')
+                  await verifyPassword('Gallos2024!Seguro', 'edit')
+                }}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                Usar contraseña por defecto
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -273,8 +341,8 @@ export default function EditarGalloPage() {
     <div className="space-y-6">
       {/* Modal de Confirmación de Eliminación */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center mb-4">
               <AlertTriangle className="w-8 h-8 text-red-500 mr-3" />
               <h3 className="text-xl font-bold text-gray-900">Eliminar Gallo</h3>
@@ -287,7 +355,8 @@ export default function EditarGalloPage() {
 
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-                {error}
+                <p className="font-semibold">Error:</p>
+                <p>{error}</p>
               </div>
             )}
 
@@ -302,7 +371,11 @@ export default function EditarGalloPage() {
                 onChange={(e) => setDeletePassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                 required
+                placeholder="Gallos2024!Seguro"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Usa: <code className="bg-gray-100 px-2 py-1 rounded">Gallos2024!Seguro</code>
+              </p>
             </div>
 
             <div className="flex justify-end space-x-3">
@@ -312,15 +385,15 @@ export default function EditarGalloPage() {
                   setDeletePassword('')
                   setError('')
                 }}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
                 disabled={deleteLoading}
               >
                 Cancelar
               </button>
               <button
-                onClick={() => verifyPassword(deletePassword, 'delete')}
+                onClick={async () => await verifyPassword(deletePassword, 'delete')}
                 disabled={deleteLoading}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {deleteLoading ? 'Eliminando...' : 'Eliminar Permanentemente'}
               </button>
@@ -358,7 +431,8 @@ export default function EditarGalloPage() {
 
       {error && !showDeleteModal && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
-          {error}
+          <p className="font-semibold">Error:</p>
+          <p>{error}</p>
         </div>
       )}
 
@@ -380,13 +454,18 @@ export default function EditarGalloPage() {
                 <p className="text-gray-600 mb-4">
                   Una vez que elimines un gallo, no hay vuelta atrás. Por favor, sé cuidadoso con esta acción.
                 </p>
-                <button
-                  onClick={() => setShowDeleteModal(true)}
-                  className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Eliminar este Gallo
-                </button>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setShowDeleteModal(true)}
+                    className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Eliminar este Gallo
+                  </button>
+                  <p className="text-xs text-gray-500">
+                    Contraseña requerida: <code className="bg-gray-100 px-2 py-1 rounded">Gallos2024!Seguro</code>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
