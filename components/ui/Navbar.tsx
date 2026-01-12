@@ -17,7 +17,8 @@ import {
   UserCircle,
   Zap,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  Lock // Icono agregado para Configuración
 } from 'lucide-react'
 import Image from 'next/image'
 
@@ -131,8 +132,8 @@ export default function Navbar({ session }: { session: Session | null }) {
                     <Image
                       src="/logo/logo-full.jpg"
                       alt="Registro Mi Patio - Sistema de Gestión Avícola"
-                      width={100}  // Reducido a 100px
-                      height={30}  // Mantiene proporción
+                      width={100}
+                      height={30}
                       className="object-contain transition-all duration-300 group-hover:opacity-90"
                       priority
                       sizes="(max-width: 768px) 40px, 100px"
@@ -235,6 +236,19 @@ export default function Navbar({ session }: { session: Session | null }) {
             <div className="hidden md:flex items-center space-x-3">
               {session ? (
                 <>
+                  {/* Enlace a Configuración - Desktop */}
+                  <Link
+                    href="/admin/configuracion"
+                    className={`relative group px-3 py-2 rounded-lg transition-all duration-300 flex items-center space-x-2 ${
+                      pathname === '/admin/configuracion'
+                        ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-white shadow-glow'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                    }`}
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span className="font-medium text-sm whitespace-nowrap">Configuración</span>
+                  </Link>
+                  
                   <div className="flex items-center space-x-2">
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                       <UserCircle className="w-4 h-4 text-white" />
@@ -343,6 +357,33 @@ export default function Navbar({ session }: { session: Session | null }) {
                     </div>
                   </Link>
                 ))}
+
+                {/* Enlace a Configuración - Mobile (solo si hay sesión) */}
+                {session && (
+                  <Link
+                    href="/admin/configuracion"
+                    onClick={() => setIsOpen(false)}
+                    className={`flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
+                      pathname === '/admin/configuracion'
+                        ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-white'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                        pathname === '/admin/configuracion' 
+                          ? 'bg-gradient-to-r from-blue-500 to-purple-500' 
+                          : 'bg-slate-800'
+                      }`}>
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="font-medium block text-sm">Configuración</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-500" />
+                  </Link>
+                )}
               </div>
 
               {/* Sección Explorar en móvil */}
@@ -410,6 +451,7 @@ export default function Navbar({ session }: { session: Session | null }) {
                       <span>Cerrar Sesión</span>
                     </button>
                   </div>
+                  
                 ) : (
                   <Link
                     href="/login"
@@ -420,6 +462,8 @@ export default function Navbar({ session }: { session: Session | null }) {
                     <span>Iniciar Sesión</span>
                   </Link>
                 )}
+
+                
               </div>
             </div>
           </div>
