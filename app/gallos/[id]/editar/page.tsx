@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import GalloForm from '@/components/gallos/GalloForm'
-import { ArrowLeft, Lock } from 'lucide-react'
+import { ArrowLeft, Lock, Trash2, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
 export default function EditarGalloPage() {
@@ -17,6 +17,9 @@ export default function EditarGalloPage() {
   const [showPasswordForm, setShowPasswordForm] = useState(true)
   const [gallo, setGallo] = useState<any>(null)
   const [error, setError] = useState('')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const id = params.id as string
 
@@ -39,8 +42,7 @@ export default function EditarGalloPage() {
     }
   }
 
-  const verifyPassword = async () => {
-    setLoading(true)
+  const verifyPassword = async (passwordToVerify: string, action: 'edit' | 'delete') => {
     setError('')
 
     try {
@@ -51,15 +53,67 @@ export default function EditarGalloPage() {
 
       if (error) throw error
 
-      if (data.clave_edicion === password) {
-        setShowPasswordForm(false)
+      if (data.clave_edicion === passwordToVerify) {
+        if (action === 'edit') {
+          setShowPasswordForm(false)
+        } else if (action === 'delete') {
+          await handleDeleteGallo()
+        }
+        return true
       } else {
         setError('Contraseña incorrecta')
+        return false
       }
     } catch (error: any) {
       setError('Error verificando contraseña')
+      return false
+    }
+  }
+
+  const handleDeleteGallo = async () => {
+    setDeleteLoading(true)
+    try {
+      // Eliminar imágenes del storage primero
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user && gallo) {
+        const imagesToDelete = [
+          gallo.foto_gallo,
+          gallo.foto_padre,
+          gallo.foto_madre,
+          gallo.foto_abuelo,
+          gallo.foto_abuela
+        ].filter(url => url)
+
+        // Eliminar cada imagen del storage
+        for (const imageUrl of imagesToDelete) {
+          if (imageUrl) {
+            const path = imageUrl.split('/storage/v1/object/public/gallos-imagenes/')[1]
+            if (path) {
+              await supabase.storage
+                .from('gallos-imagenes')
+                .remove([path])
+            }
+          }
+        }
+
+        // Eliminar el registro de la base de datos
+        const { error: deleteError } = await supabase
+          .from('gallos')
+          .delete()
+          .eq('id', id)
+
+        if (deleteError) throw deleteError
+
+        router.push('/gallos')
+        router.refresh()
+      }
+    } catch (error: any) {
+      console.error('Error eliminando gallo:', error)
+      setError('Error al eliminar el gallo')
     } finally {
-      setLoading(false)
+      setDeleteLoading(false)
+      setShowDeleteModal(false)
     }
   }
 
@@ -177,7 +231,7 @@ export default function EditarGalloPage() {
             </div>
           )}
 
-          <form onSubmit={(e) => { e.preventDefault(); verifyPassword(); }}>
+          <form onSubmit={(e) => { e.preventDefault(); verifyPassword(password, 'edit'); }}>
             <div className="mb-6">
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                 Contraseña de Edición
@@ -216,34 +270,127 @@ export default function EditarGalloPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
+      {/* Modal de Confirmación de Eliminación */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-500 mr-3" />
+              <h3 className="text-xl font-bold text-gray-900">Eliminar Gallo</h3>
+            </div>
+            
+            <p className="text-gray-600 mb-6">
+              Esta acción eliminará permanentemente el gallo <strong>"{gallo?.nombre}"</strong> y todas sus imágenes. 
+              Esta acción no se puede deshacer.
+            </p>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+                {error}
+              </div>
+            )}
+
+            <div className="mb-6">
+              <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-700 mb-1">
+                Ingresa la contraseña para confirmar eliminación:
+              </label>
+              <input
+                id="deletePassword"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                required
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setDeletePassword('')
+                  setError('')
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                disabled={deleteLoading}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => verifyPassword(deletePassword, 'delete')}
+                disabled={deleteLoading}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleteLoading ? 'Eliminando...' : 'Eliminar Permanentemente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Encabezado con Botón de Eliminar */}
       <div className="mb-6">
-        <Link
-          href={`/gallos/${id}`}
-          className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Volver al detalle
-        </Link>
-        <h1 className="text-3xl font-bold text-gray-900">Editar Gallo</h1>
-        <p className="text-gray-600 mt-2">
-          Modifica los campos que desees actualizar.
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <Link
+              href={`/gallos/${id}`}
+              className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Volver al detalle
+            </Link>
+            <h1 className="text-3xl font-bold text-gray-900">Editar Gallo</h1>
+            <p className="text-gray-600 mt-2">
+              Modifica los campos que desees actualizar.
+            </p>
+          </div>
+
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors self-start"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Eliminar Gallo
+          </button>
+        </div>
       </div>
 
-      {error && (
+      {error && !showDeleteModal && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
           {error}
         </div>
       )}
 
       {gallo && (
-        <GalloForm
-          onSubmit={handleSubmit}
-          loading={loading}
-          submitText="Actualizar Gallo"
-          initialData={gallo}
-        />
+        <>
+          <GalloForm
+            onSubmit={handleSubmit}
+            loading={loading}
+            submitText="Actualizar Gallo"
+            initialData={gallo}
+          />
+
+          {/* Sección de Eliminación */}
+          <div className="card-modern border-l-4 border-l-red-500">
+            <div className="flex items-start">
+              <AlertTriangle className="w-6 h-6 text-red-500 mr-3 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Zona de Peligro</h3>
+                <p className="text-gray-600 mb-4">
+                  Una vez que elimines un gallo, no hay vuelta atrás. Por favor, sé cuidadoso con esta acción.
+                </p>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Eliminar este Gallo
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
