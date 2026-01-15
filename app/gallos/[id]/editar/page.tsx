@@ -20,76 +20,73 @@ export default function EditarGalloPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletePassword, setDeletePassword] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
-  const [configPassword, setConfigPassword] = useState<string>('')
+  const [currentUser, setCurrentUser] = useState<any>(null)
 
   const id = params.id as string
 
   useEffect(() => {
+    loadCurrentUser()
     loadGallo()
-    loadConfigPassword()
   }, [id])
 
-  const loadGallo = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('gallos')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (error) {
-        console.error('Error cargando gallo:', error)
-        setError('No se pudo cargar el gallo')
-      } else {
-        setGallo(data)
-      }
-    } catch (error) {
-      console.error('Error:', error)
-      setError('Error cargando datos')
+  const loadCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      setCurrentUser(user)
     }
   }
 
-const loadConfigPassword = async () => {
-  try {
-    // Agrega limit(1) para obtener solo un registro
+  const loadGallo = async () => {
     const { data, error } = await supabase
-      .from('configuracion')
-      .select('clave_edicion')
-      .limit(1)  // Limita a un solo resultado
-      .single(); // Asegura que sea un solo objeto
+      .from('gallos')
+      .select('*')
+      .eq('id', id)
+      .single()
 
-      
-      if (error) {
-        console.warn('No se pudo cargar la configuración, usando valor por defecto')
-        // Valor por defecto si no existe la tabla
-        setConfigPassword('Gallos2024!Seguro')
-      } else if (data) {
-        setConfigPassword(data.clave_edicion)
-      } else {
-        // Si la tabla existe pero está vacía
-        setConfigPassword('Gallos2024!Seguro')
-      }
-    } catch (error) {
-      console.error('Error cargando configuración:', error)
-      setConfigPassword('Gallos2024!Seguro')
+    if (error) {
+      console.error('Error cargando gallo:', error)
+      setError('No se pudo cargar el gallo')
+    } else {
+      setGallo(data)
     }
   }
 
   const verifyPassword = async (passwordToVerify: string, action: 'edit' | 'delete') => {
     setError('')
-    setLoading(true)
 
     try {
-      console.log('Contraseña ingresada:', passwordToVerify)
-      console.log('Contraseña configurada:', configPassword)
-
-      if (!passwordToVerify) {
-        setError('Por favor ingresa la contraseña')
-        return false
+      if (!currentUser) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          throw new Error('Usuario no autenticado')
+        }
+        setCurrentUser(user)
       }
 
-      // Verificar contra la contraseña cargada
-      if (passwordToVerify === configPassword) {
+      // Obtener contraseña del perfil del usuario
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('clave_edicion')
+        .eq('id', currentUser.id)
+        .single()
+
+      if (profileError) {
+        console.error('Error obteniendo perfil:', profileError)
+        // Si no existe perfil, usar contraseña por defecto
+        if (passwordToVerify === 'Registromipatio2024@') {
+          if (action === 'edit') {
+            setShowPasswordForm(false)
+          } else if (action === 'delete') {
+            await handleDeleteGallo()
+          }
+          return true
+        } else {
+          setError('Contraseña incorrecta')
+          return false
+        }
+      }
+
+      if (profileData.clave_edicion === passwordToVerify) {
         if (action === 'edit') {
           setShowPasswordForm(false)
         } else if (action === 'delete') {
@@ -97,15 +94,13 @@ const loadConfigPassword = async () => {
         }
         return true
       } else {
-        setError('Contraseña incorrecta. La contraseña actual es: ' + configPassword)
+        setError('Contraseña incorrecta')
         return false
       }
     } catch (error: any) {
       console.error('Error verificando contraseña:', error)
       setError('Error verificando contraseña: ' + error.message)
       return false
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -129,13 +124,9 @@ const loadConfigPassword = async () => {
           if (imageUrl) {
             const path = imageUrl.split('/storage/v1/object/public/gallos-imagenes/')[1]
             if (path) {
-              const { error: removeError } = await supabase.storage
+              await supabase.storage
                 .from('gallos-imagenes')
                 .remove([path])
-              
-              if (removeError) {
-                console.warn('Error eliminando imagen:', removeError)
-              }
             }
           }
         }
@@ -157,7 +148,6 @@ const loadConfigPassword = async () => {
     } finally {
       setDeleteLoading(false)
       setShowDeleteModal(false)
-      setDeletePassword('')
     }
   }
 
@@ -265,27 +255,20 @@ const loadConfigPassword = async () => {
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Verificación Requerida</h1>
             <p className="text-gray-600 mt-2">
-              Ingresa la contraseña de edición para modificar este gallo
-            </p>
-            <p className="text-sm text-gray-500 mt-2">
-              Usa: <code className="bg-gray-100 px-2 py-1 rounded">Gallos2024!Seguro</code>
+              Ingresa tu contraseña personal de edición para modificar este gallo
             </p>
           </div>
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-              <p className="font-semibold">Error:</p>
-              <p>{error}</p>
+              {error}
             </div>
           )}
 
-          <form onSubmit={async (e) => { 
-            e.preventDefault(); 
-            await verifyPassword(password, 'edit'); 
-          }}>
+          <form onSubmit={(e) => { e.preventDefault(); verifyPassword(password, 'edit'); }}>
             <div className="mb-6">
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Contraseña de Edición
+                Tu Contraseña de Edición
               </label>
               <input
                 id="password"
@@ -294,23 +277,31 @@ const loadConfigPassword = async () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
-                placeholder="Ingresa la contraseña"
+                placeholder="Ingresa tu contraseña personal"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Contraseña actual: {configPassword || 'Cargando...'}
-              </p>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? 'Verificando...' : 'Verificar y Continuar'}
-            </button>
+            <div className="space-y-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Verificando...' : 'Verificar y Continuar'}
+              </button>
+              
+              <div className="text-center">
+                <p className="text-sm text-gray-500">
+                  ¿Olvidaste tu contraseña? 
+                  <Link href="/configuracion" className="text-blue-600 hover:text-blue-700 ml-1">
+                    Configuración
+                  </Link>
+                </p>
+              </div>
+            </div>
           </form>
 
-          <div className="mt-6 space-y-4">
+          <div className="mt-6">
             <Link
               href={`/gallos/${id}`}
               className="flex items-center justify-center text-gray-600 hover:text-gray-700"
@@ -318,19 +309,6 @@ const loadConfigPassword = async () => {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Volver al detalle del gallo
             </Link>
-            
-            <div className="text-center">
-              <button
-                onClick={async () => {
-                  // Botón de prueba con contraseña por defecto
-                  setPassword('Gallos2024!Seguro')
-                  await verifyPassword('Gallos2024!Seguro', 'edit')
-                }}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                Usar contraseña por defecto
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -341,8 +319,8 @@ const loadConfigPassword = async () => {
     <div className="space-y-6">
       {/* Modal de Confirmación de Eliminación */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <div className="flex items-center mb-4">
               <AlertTriangle className="w-8 h-8 text-red-500 mr-3" />
               <h3 className="text-xl font-bold text-gray-900">Eliminar Gallo</h3>
@@ -355,14 +333,13 @@ const loadConfigPassword = async () => {
 
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-                <p className="font-semibold">Error:</p>
-                <p>{error}</p>
+                {error}
               </div>
             )}
 
             <div className="mb-6">
               <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-700 mb-1">
-                Ingresa la contraseña para confirmar eliminación:
+                Ingresa tu contraseña para confirmar eliminación:
               </label>
               <input
                 id="deletePassword"
@@ -371,11 +348,8 @@ const loadConfigPassword = async () => {
                 onChange={(e) => setDeletePassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                 required
-                placeholder="Gallos2024!Seguro"
+                placeholder="Tu contraseña personal"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Usa: <code className="bg-gray-100 px-2 py-1 rounded">Gallos2024!Seguro</code>
-              </p>
             </div>
 
             <div className="flex justify-end space-x-3">
@@ -385,15 +359,15 @@ const loadConfigPassword = async () => {
                   setDeletePassword('')
                   setError('')
                 }}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 disabled={deleteLoading}
               >
                 Cancelar
               </button>
               <button
-                onClick={async () => await verifyPassword(deletePassword, 'delete')}
+                onClick={() => verifyPassword(deletePassword, 'delete')}
                 disabled={deleteLoading}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {deleteLoading ? 'Eliminando...' : 'Eliminar Permanentemente'}
               </button>
@@ -431,8 +405,7 @@ const loadConfigPassword = async () => {
 
       {error && !showDeleteModal && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
-          <p className="font-semibold">Error:</p>
-          <p>{error}</p>
+          {error}
         </div>
       )}
 
@@ -454,18 +427,13 @@ const loadConfigPassword = async () => {
                 <p className="text-gray-600 mb-4">
                   Una vez que elimines un gallo, no hay vuelta atrás. Por favor, sé cuidadoso con esta acción.
                 </p>
-                <div className="space-y-3">
-                  <button
-                    onClick={() => setShowDeleteModal(true)}
-                    className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Eliminar este Gallo
-                  </button>
-                  <p className="text-xs text-gray-500">
-                    Contraseña requerida: <code className="bg-gray-100 px-2 py-1 rounded">Gallos2024!Seguro</code>
-                  </p>
-                </div>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Eliminar este Gallo
+                </button>
               </div>
             </div>
           </div>

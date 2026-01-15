@@ -18,7 +18,8 @@ import {
   Zap,
   ChevronRight,
   ChevronDown,
-  Lock // Icono agregado para Configuración
+  Lock, // Icono agregado para Configuración
+  Settings
 } from 'lucide-react'
 import Image from 'next/image'
 
@@ -94,6 +95,7 @@ export default function Navbar({ session }: { session: Session | null }) {
       icon: <PlusCircle className="w-4 h-4" />,
       badge: 'Nuevo'
     },
+  
   ]
 
   return (

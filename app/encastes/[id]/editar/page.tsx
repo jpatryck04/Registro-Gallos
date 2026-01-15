@@ -20,12 +20,21 @@ export default function EditarEncastesPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletePassword, setDeletePassword] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
 
   const id = params.id as string
 
   useEffect(() => {
+    loadCurrentUser()
     loadEncastes()
   }, [id])
+
+  const loadCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      setCurrentUser(user)
+    }
+  }
 
   const loadEncastes = async () => {
     const { data, error } = await supabase
@@ -46,14 +55,38 @@ export default function EditarEncastesPage() {
     setError('')
 
     try {
-      const { data, error } = await supabase
-        .from('configuracion')
+      if (!currentUser) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          throw new Error('Usuario no autenticado')
+        }
+        setCurrentUser(user)
+      }
+
+      // Obtener contraseña del perfil del usuario
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
         .select('clave_edicion')
+        .eq('id', currentUser.id)
         .single()
 
-      if (error) throw error
+      if (profileError) {
+        console.error('Error obteniendo perfil:', profileError)
+        // Si no existe perfil, usar contraseña por defecto
+        if (passwordToVerify === 'Registromipatio2024@') {
+          if (action === 'edit') {
+            setShowPasswordForm(false)
+          } else if (action === 'delete') {
+            await handleDeleteEncastes()
+          }
+          return true
+        } else {
+          setError('Contraseña incorrecta')
+          return false
+        }
+      }
 
-      if (data.clave_edicion === passwordToVerify) {
+      if (profileData.clave_edicion === passwordToVerify) {
         if (action === 'edit') {
           setShowPasswordForm(false)
         } else if (action === 'delete') {
@@ -65,7 +98,8 @@ export default function EditarEncastesPage() {
         return false
       }
     } catch (error: any) {
-      setError('Error verificando contraseña')
+      console.error('Error verificando contraseña:', error)
+      setError('Error verificando contraseña: ' + error.message)
       return false
     }
   }
@@ -108,7 +142,7 @@ export default function EditarEncastesPage() {
       }
     } catch (error: any) {
       console.error('Error eliminando encaste:', error)
-      setError('Error al eliminar el encaste')
+      setError('Error al eliminar el encaste: ' + error.message)
     } finally {
       setDeleteLoading(false)
       setShowDeleteModal(false)
@@ -205,7 +239,7 @@ export default function EditarEncastesPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Verificación Requerida</h1>
             <p className="text-gray-600 mt-2">
-              Ingresa la contraseña de edición para modificar este encaste
+              Ingresa tu contraseña personal de edición para modificar este encaste
             </p>
           </div>
 
@@ -218,7 +252,7 @@ export default function EditarEncastesPage() {
           <form onSubmit={(e) => { e.preventDefault(); verifyPassword(password, 'edit'); }}>
             <div className="mb-6">
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Contraseña de Edición
+                Tu Contraseña de Edición
               </label>
               <input
                 id="password"
@@ -227,16 +261,28 @@ export default function EditarEncastesPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                placeholder="Ingresa tu contraseña personal"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Verificando...' : 'Verificar y Continuar'}
-            </button>
+            <div className="space-y-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Verificando...' : 'Verificar y Continuar'}
+              </button>
+              
+              <div className="text-center">
+                <p className="text-sm text-gray-500">
+                  ¿Olvidaste tu contraseña? 
+                  <Link href="/configuracion" className="text-blue-600 hover:text-blue-700 ml-1">
+                    Configuración
+                  </Link>
+                </p>
+              </div>
+            </div>
           </form>
 
           <div className="mt-6">
@@ -277,7 +323,7 @@ export default function EditarEncastesPage() {
 
             <div className="mb-6">
               <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-700 mb-1">
-                Ingresa la contraseña para confirmar eliminación:
+                Ingresa tu contraseña para confirmar eliminación:
               </label>
               <input
                 id="deletePassword"
@@ -286,6 +332,7 @@ export default function EditarEncastesPage() {
                 onChange={(e) => setDeletePassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                 required
+                placeholder="Tu contraseña personal"
               />
             </div>
 
