@@ -183,25 +183,13 @@ export default function GalloForm({
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+                
               </div>
             </div>
 
             <div className="space-y-4">
               <h3 className="font-medium text-gray-700">Placas</h3>
               <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Placa del Gallo
-                  </label>
-                  <input
-                    type="text"
-                    name="placa_gallo"
-                    value={formData.placa_gallo}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Número + Color"
-                  />
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Placa del Padre
@@ -226,9 +214,47 @@ export default function GalloForm({
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Placa del Abuelo
+                  </label>
+                  <input
+                    type="text"
+                    name="placa_abuelo"
+                    value={formData.placa_abuelo}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Placa de la Abuela
+                  </label>
+                  <input
+                    type="text"
+                    name="placa_abuela"
+                    value={formData.placa_abuela}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
             </div>
           </div>
+          {/* Placa del Gallo centrada */}
+  <div className="col-span-full max-w-md mx-auto">
+    <label className="block text-sm font-medium text-gray-700 mb-1 text-center">
+      Placa del Gallo
+    </label>
+    <input
+      type="text"
+      name="placa_gallo"
+      value={formData.placa_gallo}
+      onChange={handleInputChange}
+      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      placeholder="Número + Color"
+    />
+  </div>
         </div>
 
         {/* Sección 3: Rasgos físicos */}
@@ -276,10 +302,10 @@ export default function GalloForm({
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Seleccionar</option>
-                <option value="simple">Simple</option>
-                <option value="rosada">Rosada</option>
-                <option value="guisante">Guisante</option>
-                <option value="nuez">Nuez</option>
+                <option value="Peine">Peine</option>
+                <option value="Rosa">Rosa</option>
+                <option value="Motón">Motón</option>
+                <option value="Nula">Nula</option>
               </select>
             </div>
           </div>
@@ -317,8 +343,9 @@ export default function GalloForm({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Seleccionar</option>
-                  <option value="brida">Brida de Nylon</option>
-                  <option value="tairra">Tairra</option>
+                  <option value="Brida-Tairra">Brida de Nylon - Tairra</option>
+                  <option value="Alambre">Alambre</option>
+                  <option value="Hilo">Hilo</option>
                 </select>
               </div>
 
